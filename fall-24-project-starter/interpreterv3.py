@@ -1,5 +1,6 @@
 from intbase import InterpreterBase, ErrorType
 from brewparse import parse_program
+from data_object import Data_Object
 
 class Interpreter(InterpreterBase):
     def __init__(self, console_output=True, inp=None, trace_output=False):
@@ -26,6 +27,8 @@ class Interpreter(InterpreterBase):
         self.func_defs_to_node = dict()
         self.global_scope = [ self.var_name_to_val ]
         self.val_types = [ self.INT_NODE, self.BOOL_NODE, self.STRING_NODE, self.NIL_NODE ]
+        for struct in self.ast.dict['structs']:
+            self.val_types.append(struct.dict['name'])
         self.arithmetic_ops = ['+', '-', '*', '/', self.NEG_NODE]
         self.comparison_ops = ['<', '>', '<=', '>=', '==', '!=']
         self.bool_ops = ['&&', '||', '!']

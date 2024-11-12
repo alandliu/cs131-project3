@@ -1,4 +1,4 @@
-from interpreterv2 import Interpreter
+from interpreterv3 import Interpreter
 
 if __name__ == "__main__":
     program = """
@@ -176,6 +176,11 @@ OUT */
     """
 
     program_scratch = """
+
+    struct test {
+      name: string;
+      vaccinated: bool;
+    }
 func main() {
  print(catalan(4));
 }
