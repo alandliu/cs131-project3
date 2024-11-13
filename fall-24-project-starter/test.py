@@ -177,6 +177,18 @@ OUT */
     """
 
     program_scratch = """
+    struct Dog {
+      x: int;
+    }
+    struct Cat {
+    x: int;
+    }
+    struct Avian {
+    x: int;
+    }
+    struct Person {
+    x: int;
+    }
 func main() {
 	print(nil == print(true));
 }
