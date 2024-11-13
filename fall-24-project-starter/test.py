@@ -1,4 +1,5 @@
 from interpreterv3 import Interpreter
+from data_object import Data_Object
 
 if __name__ == "__main__":
     program = """
@@ -176,30 +177,9 @@ OUT */
     """
 
     program_scratch = """
-
-    struct test {
-      name: string;
-      vaccinated: bool;
-    }
 func main() {
- print(catalan(4));
-}
-
-func catalan(n) {
-	return catalan_help(n, 0, 0);
-}
-
-func catalan_help(n, ans, j) {
- if (n < 2) {
-  return 1;
- } else {
-  for (j = j;j < n; j = j + 1) {
-   ans = ans + catalan(j) * catalan(n - j - 1);
-  }
-  return ans;
- }
+	print(nil == print(true));
 }
     """
-
     interpreter = Interpreter()
     interpreter.run(program_scratch)

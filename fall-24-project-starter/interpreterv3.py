@@ -2,6 +2,8 @@ from intbase import InterpreterBase, ErrorType
 from brewparse import parse_program
 from data_object import Data_Object
 
+
+# returns of any kind must be a data object
 class Interpreter(InterpreterBase):
     def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)
@@ -89,7 +91,7 @@ class Interpreter(InterpreterBase):
                 ErrorType.NAME_ERROR,
                 f"Variable {var_name} defined more than once",
             )
-        local_scope[statement_node.dict['name']] = None
+        local_scope[statement_node.dict['name']] = self.nil_object()
         return
     
     def do_assignment(self, statement_node, scopes):
@@ -109,7 +111,7 @@ class Interpreter(InterpreterBase):
             )
 
         expression = statement_node.dict['expression']
-        result = None
+        result = self.nil_object()
         if expression.elem_type in self.val_types:
             result = self.evaluate_value(expression, scopes)
         elif expression.elem_type == self.VAR_NODE:
@@ -117,10 +119,11 @@ class Interpreter(InterpreterBase):
         elif expression.elem_type == self.FCALL_NODE:
             result = self.do_call(expression, scopes)
         elif expression.elem_type == self.NIL_NODE:
-            result = None
+            result = self.nil_object()
         else:
             result = self.evaluate_expression(expression, scopes)
             
+        # Returns will ALWAYS be Data Objects
         ref_scope[var_name] = result
         return
     
@@ -131,8 +134,8 @@ class Interpreter(InterpreterBase):
         fcall_name = statement_node.dict['name']
 
         if fcall_name == 'print':
-            self.fcall_print(statement_node.dict['args'], scopes)
-            return
+            return self.fcall_print(statement_node.dict['args'], scopes)
+
         elif fcall_name == 'inputi':
             return self.fcall_inputi(scopes, statement_node.dict['args'])
         elif fcall_name == 'inputs':
@@ -145,7 +148,7 @@ class Interpreter(InterpreterBase):
                 f"Function {fcall_name} was not found",
             )
         new_scope = dict()
-        new_scope['ret'] = None
+        new_scope['ret'] = Data_Object(self.NIL_NODE, None)
         fcall_arg_name_list = self.func_defs_to_node[fcall_dict_key].dict['args']
         fcall_arg_list = statement_node.dict['args']
         for i in range(len(fcall_arg_list)):
@@ -168,11 +171,10 @@ class Interpreter(InterpreterBase):
         if self.trace_output:
             print("Running if node")
             print(scopes)
-        condition_result = None
         condition_node = if_node.dict['condition']
         condition_result = self.evaluate_conditional(condition_node, scopes)
         new_scopes = scopes + [dict()]
-        if condition_result: 
+        if condition_result.get_value(): 
             ret = self.run_body(if_node.dict['statements'], new_scopes)
         else:
             ret = self.run_body(if_node.dict['else_statements'], new_scopes)
@@ -188,7 +190,7 @@ class Interpreter(InterpreterBase):
         self.do_assignment(for_node.dict['init'], scopes)
         condition_node = for_node.dict['condition']
         condition_eval = self.evaluate_conditional(condition_node, scopes)
-        while condition_eval:
+        while condition_eval.get_value():
             new_scope = scopes + [dict()]
             ret = self.run_body(for_node.dict['statements'], new_scope)
             if ret:
@@ -230,86 +232,89 @@ class Interpreter(InterpreterBase):
         operand_1 = self.evaluate_operand(elem_1, scopes)
 
         if elem_type == self.NEG_NODE:
-            if type(operand_1) is not int:
+            if operand_1.get_type() != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Incompatible type for neg operation"
                 )
-            return -1 * operand_1
+            return Data_Object(self.INT_NODE, -1 * operand_1.get_value())
         elif elem_type == self.NOT_NODE:
-            if type(operand_1) is not bool:
+            if operand_1.get_type() != self.BOOL_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Incompatible type for ! operation"
                 )
-            return not operand_1
+            return Data_Object(self.BOOL_NODE, not operand_1.get_value())
         
         elem_2 = expression_node.dict['op2']
         operand_2 = self.evaluate_operand(elem_2, scopes)
 
         if elem_type == '+':
-            if type(operand_1) is type(operand_2) and type(operand_1) is not bool:
-                return operand_1 + operand_2
+            if self.check_addition_compatible(operand_1, operand_2):
+                result = operand_1 + operand_2
+                if type(result) is int:
+                    return Data_Object(self.INT_NODE, result)
+                return Data_Object(self.STRING_NODE, result)
             super().error(
                 ErrorType.TYPE_ERROR,
-                f"Cannot use operator + on boolean or mismatched operators"
+                f"Cannot use operator + on non-string and non-integer operators"
             )
         elif elem_type == '-':
-            if type(operand_1) is not int or type(operand_2) is not int:
+            if operand_1.get_type() != self.INT_NODE or operand_2.get_type() != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator - on non-integer operators"
                 )
-            return operand_1 - operand_2
+            return Data_Object(self.INT_NODE, operand_1 - operand_2)
         elif elem_type == '/':
-            if type(operand_1) is not int or type(operand_2) is not int:
+            if operand_1.get_type() != self.INT_NODE or operand_2.get_type() != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator / on non-integer operators"
                 )
-            return int(operand_1 // operand_2)
+            return Data_Object(self.INT_NODE, operand_1 // operand_2)
         elif elem_type == '*':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return operand_1 * operand_2
+            return Data_Object(self.INT_NODE, operand_1 * operand_2)
         elif elem_type == '==':
-            if type(operand_1) is not type(operand_2):
-                return False
-            return operand_1 == operand_2
+            if operand_1.get_type() != operand_2.get_type():
+                return self.false_object()
+            return Data_Object(self.BOOL_NODE, operand_1 == operand_2)
         elif elem_type == '<':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return operand_1 < operand_2
+            return Data_Object(self.BOOL_NODE, operand_1 < operand_2)
         elif elem_type == '>':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return operand_1 > operand_2
+            return Data_Object(self.BOOL_NODE, operand_1 > operand_2)
         elif elem_type == '<=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return operand_1 <= operand_2
+            return Data_Object(self.BOOL_NODE, operand_1 <= operand_2)
         elif elem_type == '>=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return operand_1 >= operand_2
+            return Data_Object(self.BOOL_NODE, operand_1 >= operand_2)
         elif elem_type == '!=':
-            if type(operand_1) is not type(operand_2):
-                return True
-            return operand_1 != operand_2
+            if operand_1.get_type() != operand_2.get_type():
+                return self.true_object()
+            return Data_Object(self.BOOL_NODE, operand_1 != operand_2)
         elif elem_type == '||':
-            if type(operand_1) is not bool or type(operand_2) is not bool:
+            if operand_1.get_type() != self.BOOL_NODE or operand_2.get_type() != self.BOOL_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator || on non-boolean operators"
                 )
-            return operand_1 or operand_2
+            return Data_Object(self.BOOL_NODE, operand_1.get_value() or operand_2.get_value())
         elif elem_type == '&&':
-            if type(operand_1) is not bool or type(operand_2) is not bool:
+            if operand_1.get_type() != self.BOOL_NODE or operand_2.get_type() != self.BOOL_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator && on non-boolean operators"
                 )
-            return operand_1 and operand_2
+            return Data_Object(self.BOOL_NODE, operand_1.get_value() and operand_2.get_value())
 
     #####################################################################
     # variable node evaluation 
@@ -338,12 +343,12 @@ class Interpreter(InterpreterBase):
             print(scopes)
         if val_node.elem_type == self.BOOL_NODE:
             if val_node.dict['val'] == self.TRUE_DEF:
-                return True
+                return self.true_object()
             elif val_node.dict['val'] == self.FALSE_DEF:
-                return False
+                return self.false_object()
         elif val_node.elem_type == self.NIL_NODE:
-            return None
-        return val_node.dict['val']
+            return self.nil_object()
+        return Data_Object(val_node.elem_type, val_node.dict['val'])
 
     #####################################################################
     # operand node evaluation 
@@ -357,7 +362,7 @@ class Interpreter(InterpreterBase):
         elif operand_node.elem_type == self.FCALL_NODE:
             return self.do_call(operand_node, scopes)
         elif operand_node.elem_type == self.NIL_NODE:
-            return None
+            return self.nil_object()
         else:
             return self.evaluate_value(operand_node, scopes)
 
@@ -368,7 +373,7 @@ class Interpreter(InterpreterBase):
     
     def evaluate_conditional(self, condition_node, scopes):
         condition_type = condition_node.elem_type
-        condition_eval = None
+        condition_eval = self.nil_object()
         if condition_type == self.VAR_NODE:
             condition_eval = self.evaluate_variable_node(condition_node, scopes)
         elif condition_type == self.BOOL_NODE:
@@ -395,27 +400,27 @@ class Interpreter(InterpreterBase):
         for arg in args:
             if arg.elem_type == self.VAR_NODE:
                 res = self.evaluate_variable_node(arg, scopes)
-                if type(res) is bool:
+                if res.get_type() == self.BOOL_NODE:
                     output += self.fcall_print_bool_helper(res)
                 else:
-                    output += str(self.evaluate_variable_node(arg, scopes))
+                    output += str(res.get_value())
             elif arg.elem_type == self.INT_NODE or arg.elem_type == self.STRING_NODE:
-                output += str(self.evaluate_value(arg, scopes))
+                output += str(self.evaluate_value(arg, scopes).get_value())
             elif arg.elem_type in self.arithmetic_ops:
-                output += str(self.evaluate_expression(arg, scopes))
+                output += str(self.evaluate_expression(arg, scopes).get_value())
             elif arg.elem_type in self.comparison_ops or arg.elem_type in self.bool_ops:
                 res = self.evaluate_expression(arg, scopes)
                 output += self.fcall_print_bool_helper(res)
             elif arg.elem_type == self.BOOL_NODE:
-                output += self.fcall_print_bool_helper(arg.dict['val'])
+                output += self.fcall_print_bool_helper(Data_Object(self.BOOL_NODE, arg.dict['val']))
             elif arg.elem_type == self.FCALL_NODE:
                 res = self.do_call(arg, scopes)
-                if type(res) is bool:
+                if res.get_type() == self.BOOL_NODE:
                     output += self.fcall_print_bool_helper(res)
                 else:
-                    output += str(res)
+                    output += str(res.get_value())
         super().output(output)
-        return None
+        return self.nil_object()
     
     def fcall_inputi(self, scopes, prompt = None):
         if self.trace_output:
@@ -428,8 +433,8 @@ class Interpreter(InterpreterBase):
                 f"No inputi() function found that takes > 1 parameter",
             )
         elif len(prompt) > 0:
-            super().output(self.evaluate_value(prompt[0], scopes))
-        return int(super().get_input())
+            super().output(self.evaluate_value(prompt[0], scopes).get_value())
+        return Data_Object(self.INT_NODE, int(super().get_input()))
 
     def fcall_inputs(self, scopes, prompt = None):
         if self.trace_output:
@@ -442,33 +447,52 @@ class Interpreter(InterpreterBase):
                 f"No inputs() function found that takes > 1 parameter",
             )
         elif len(prompt) > 0:
-            super().output(self.evaluate_value(prompt[0], scopes))
-        return str(super().get_input())
+            super().output(self.evaluate_value(prompt[0], scopes).get_value())
+        return Data_Object(self.STRING_NODE, str(super().get_input()))
 
 
     #####################################################################
     #  Util and Abstracted helpers
     #####################################################################
     def check_boolean(self, condition):
-        return type(condition) is bool
+        return condition.get_type() == self.BOOL_NODE
 
     def fcall_print_bool_helper(self, val):
-        if val:
+        if val.get_value():
             return 'true'
         return 'false'
 
     def verify_integer(self, condition, elem_type):
-        if type(condition) is not int:
+        if condition.get_type() != self.INT_NODE:
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Incompatible types for {elem_type} operation",
             )
 
     def type_check(self, op_1, op_2, elem_type):
-        if type(op_1) is not type(op_2):
+        if op_1.get_type() != op_2.get_type():
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Incompatible types for {elem_type} operation",
             )
+
+    def check_addition_compatible(self, op_1, op_2):
+        if op_1.get_type() != self.STRING_NODE and op_1.get_type() != self.INT_NODE:
+            return False
+        if op_2.get_type() != self.STRING_NODE and op_2.get_type() != self.INT_NODE:
+            return False
+        return True
+
+    #####################################################################
+    #  Constant Data Nodes
+    #####################################################################
+    def nil_object(self):
+        return Data_Object(self.NIL_NODE, None)
+    
+    def true_object(self):
+        return Data_Object(self.BOOL_NODE, True)
+    
+    def false_object(self):
+        return Data_Object(self.BOOL_NODE, False)
     
     
