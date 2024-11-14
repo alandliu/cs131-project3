@@ -178,20 +178,15 @@ OUT */
 
     program_scratch = """
 struct dog {
-  name : string;
-  friend : dog;
-  age : int;
-  }
-  struct cat {
-    name : string;
-  }
+  name: string;
+  vaccinated: bool;  
+}
 
-  func main() : void {
-    var fido : dog;
-    fido = new dog;
-    fido.name = "Fido";
-    fido.age = 15;
-  }
+func main() : void {
+  var d: dog;    /* d is an object reference whose value is nil */
+
+  print (d);  /* prints nil, because d was initialized to nil */
+}
     """
 
     interpreter = Interpreter()

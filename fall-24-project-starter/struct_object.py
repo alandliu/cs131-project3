@@ -15,7 +15,7 @@ class Struct_Object(Data_Object):
             elif field_type == self.STRING_TYPE:
                 self.fields[field_name] = self.string_object(self.STRING_TYPE)
             else:
-                self.fields[field_name] = self.nil_object(self.NIL_TYPE)
+                self.fields[field_name] = Struct_Object(self.NIL_TYPE, field_type, [])
 
     def __str__(self):
         return f"Struct {self.struct_type}"
@@ -31,7 +31,9 @@ class Struct_Object(Data_Object):
         return res
 
     def __eq__(self, other):
-        return self is other
+        if self.val_type == self.NIL_TYPE and other.val_type == self.NIL_TYPE:
+            return self.true_object(self.BOOL_TYPE)
+        return Data_Object(self.BOOL_TYPE, self is other)
     
     
     def change_field(self, field_name, field_data):

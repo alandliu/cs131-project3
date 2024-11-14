@@ -11,7 +11,7 @@ class Interpreter(InterpreterBase):
     # Init functions
     #####################################################################
     
-    def __init__(self, console_output=True, inp=None, trace_output=True):
+    def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
 
@@ -184,7 +184,7 @@ class Interpreter(InterpreterBase):
         if len(var_fields) > 0:
             res_struct, field_name = self.get_struct_member(ref_scope[var_name], var_fields, statement_node.dict['name'])
             var_type = res_struct.get_field_type(field_name)
-            result = self.assign_helper(var_type, assign_type, res_struct, result)
+            result = self.assign_helper(var_type, assign_type, res_struct.get_field(field_name), result)
             res_struct.change_field(field_name, result)
             return
         elif var_type != assign_type:
@@ -202,6 +202,9 @@ class Interpreter(InterpreterBase):
         elif var_type in self.struct_types and assign_type == self.NIL_NODE:
             return self.nil_object(var_type)
         else:
+            print(ref_struct.struct_type)
+            print(assign_type)
+            print(var_type)
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Type mismatch {var_type} vs {assign_type} in assignment"
@@ -471,10 +474,15 @@ class Interpreter(InterpreterBase):
         if self.trace_output:
             print("Running retrieval: " + var_node.dict['name'])
             print(scopes)
-        var_name = var_node.dict['name']
+        var_segments = var_node.dict['name'].split('.')
+        var_name = var_segments[0]
+        var_fields = var_segments[1:]
         for scope in reversed(scopes):
             if var_name in scope:
-                return scope[var_name]
+                if len(var_fields) == 0:
+                    return scope[var_name]
+                res_struct, field_name = self.get_struct_member(scope[var_name], var_fields, var_node.dict['name'])
+                return res_struct.get_field(field_name)
         super().error(
             ErrorType.NAME_ERROR,
             f"Variable {var_name} has not been defined",

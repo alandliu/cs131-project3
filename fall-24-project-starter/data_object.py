@@ -70,19 +70,6 @@ class Data_Object:
     def __ne__(self, other):
         return Data_Object(self.BOOL_TYPE, self.value != other.value)
     
-    # OBJECT DEFAULTS
-    def true_object(self):
-        return Data_Object(self.BOOL_TYPE, True)
-    
-    def false_object(self):
-        return Data_Object(self.BOOL_TYPE, False)
-    
-    def int_object(self):
-        return Data_Object(self.INT_TYPE, 0)
-    
-    def string_object(self):
-        return Data_Object(self.STRING_TYPE, "")
-    
     def __not__(self):
         return Data_Object(self.BOOL_TYPE, not self.value)
     
@@ -96,10 +83,6 @@ class Data_Object:
         return Data_Object(self.BOOL_TYPE, res)
     
     # DEFAULTS
-    @staticmethod
-    def nil_object(NIL_TYPE):
-        return Data_Object(NIL_TYPE, None)
-    
     @staticmethod
     def void_object(VOID_TYPE):
         return Data_Object(VOID_TYPE, None)
