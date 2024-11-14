@@ -177,13 +177,16 @@ OUT */
     """
 
     program_scratch = """
-func main() : int {
-  print(foo());
+struct dog {
+  name : string;
 }
 
-func foo() : int {
-  return 1;
+func main() : void {
+  if (5 != "test") {
+    print("Hey.");
+  }
 }
+
     """
     interpreter = Interpreter()
     interpreter.run(program_scratch)

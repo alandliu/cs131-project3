@@ -4,6 +4,7 @@ class Data_Object:
     STRING_TYPE = 'string'
     BOOL_TYPE = 'bool'
     VOID_TYPE = 'void'
+    NIL_TYPE = 'nil'
     COERCIBLE = [ INT_TYPE, BOOL_TYPE ]
 
     def __init__(self, val_type, value):
@@ -58,10 +59,6 @@ class Data_Object:
         return Data_Object(self.BOOL_TYPE, self.value < other.value)
     
     def __eq__(self, other):
-        if self.val_type in self.COERCIBLE and other.val_type in self.COERCIBLE:
-            return Data_Object(self.BOOL_TYPE, self.coerce_i_to_b().value == other.coerce_i_to_b().value)
-        elif self.val_type != other.val_type:
-            return self.false_object()
         return Data_Object(self.BOOL_TYPE, self.value == other.value)
     
     def __le__(self, other):
@@ -71,10 +68,6 @@ class Data_Object:
         return Data_Object(self.BOOL_TYPE, self.value >= other.value)
     
     def __ne__(self, other):
-        if self.val_type in self.COERCIBLE and other.val_type in self.COERCIBLE:
-            return Data_Object(self.BOOL_TYPE, self.coerce_i_to_b().value != other.coerce_i_to_b().value)
-        elif self.val_type != other.val_type:
-            return self.true_object()
         return Data_Object(self.BOOL_TYPE, self.value != other.value)
     
     # OBJECT DEFAULTS
@@ -101,3 +94,28 @@ class Data_Object:
     def logical_or(self, other):
         res = self.coerce_i_to_b().get_value() or other.coerce_i_to_b().get_value()
         return Data_Object(self.BOOL_TYPE, res)
+    
+    # DEFAULTS
+    @staticmethod
+    def nil_object(NIL_TYPE):
+        return Data_Object(NIL_TYPE, None)
+    
+    @staticmethod
+    def void_object(VOID_TYPE):
+        return Data_Object(VOID_TYPE, None)
+    
+    @staticmethod
+    def true_object(BOOL_TYPE):
+        return Data_Object(BOOL_TYPE, True)
+    
+    @staticmethod
+    def false_object(BOOL_TYPE):
+        return Data_Object(BOOL_TYPE, False)
+    
+    @staticmethod
+    def int_object(INT_TYPE):
+        return Data_Object(INT_TYPE, 0)
+    
+    @staticmethod
+    def string_object(STRING_TYPE):
+        return Data_Object(STRING_TYPE, "")
