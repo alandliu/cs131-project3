@@ -6,6 +6,11 @@ from struct_object import Struct_Object
 
 # returns of any kind must be a data object
 class Interpreter(InterpreterBase):
+    
+    #####################################################################
+    # Init functions
+    #####################################################################
+    
     def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
@@ -22,6 +27,16 @@ class Interpreter(InterpreterBase):
             "No main() function was found"
         )
 
+    def verify_all_func_types(self):
+        for func_key in self.func_defs_to_node.keys():
+            cur_func_node = self.func_defs_to_node[func_key]
+            func_ret_type = cur_func_node.dict['return_type']
+            if func_ret_type not in self.var_types and func_ret_type not in self.struct_types and func_ret_type != self.VOID_DEF:
+                super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Invalid return type {func_ret_type} in function {cur_func_node.dict['name']}"
+                )
+
     def run(self, program):
         self.ast = parse_program(program)
         if self.trace_output:
@@ -29,13 +44,18 @@ class Interpreter(InterpreterBase):
         self.var_name_to_val = dict()
         self.func_defs_to_node = dict()
         self.global_scope = [ self.var_name_to_val ]
-        self.val_types = [ self.INT_NODE, self.BOOL_NODE, self.STRING_NODE, self.NIL_NODE ]
+        self.var_types = [ self.INT_NODE, self.BOOL_NODE, self.STRING_NODE, self.NIL_NODE ]
         self.struct_types = [s.dict['name'] for s in self.ast.dict['structs']]
         self.arithmetic_ops = ['+', '-', '*', '/', self.NEG_NODE]
         self.comparison_ops = ['<', '>', '<=', '>=', '==', '!=']
         self.bool_ops = ['&&', '||', '!']
         main_func_node = self.get_main_func_node(self.ast)
+        self.verify_all_func_types()
         self.run_func(main_func_node, self.global_scope)
+
+    #####################################################################
+    # body execution functions
+    #####################################################################
     
     def run_func(self, func_node, scopes):
         if self.trace_output:
@@ -46,6 +66,15 @@ class Interpreter(InterpreterBase):
             if ret or statement.elem_type == self.RETURN_NODE:
                 return
         return
+    
+    def run_body(self, statements, scopes):
+        if statements == None:
+            return False
+        for statement in statements:
+            ret = self.run_statement(statement, scopes)
+            if ret or statement.elem_type == self.RETURN_NODE:
+                return True
+        return False
     
     def run_statement(self, statement_node, scopes):
         if self.trace_output:
@@ -66,15 +95,6 @@ class Interpreter(InterpreterBase):
         elif elem_type == self.RETURN_NODE:
             ret = self.do_return(statement_node, scopes)
         return ret
-    
-    def run_body(self, statements, scopes):
-        if statements == None:
-            return False
-        for statement in statements:
-            ret = self.run_statement(statement, scopes)
-            if ret or statement.elem_type == self.RETURN_NODE:
-                return True
-        return False
 
     #####################################################################
     # statement behaviors
@@ -91,7 +111,23 @@ class Interpreter(InterpreterBase):
                 ErrorType.NAME_ERROR,
                 f"Variable {var_name} defined more than once",
             )
-        local_scope[statement_node.dict['name']] = self.nil_object()
+
+        var_type = statement_node.dict['var_type']
+        init_val = self.nil_object()
+        if var_type == self.INT_NODE:
+            init_val = self.int_object()
+        elif var_type == self.STRING_NODE:
+            init_val = self.string_object()
+        elif var_type == self.BOOL_NODE:
+            init_val = self.false_object()
+        elif var_type in self.struct_types:
+            init_val = self.struct_object()
+        else:
+            super().error(
+                ErrorType.TYPE_ERROR,
+                f"Unknown/invalid type specified {var_type}"
+            )
+        local_scope[var_name] = init_val
         return
     
     def do_assignment(self, statement_node, scopes):
@@ -112,7 +148,7 @@ class Interpreter(InterpreterBase):
 
         expression = statement_node.dict['expression']
         result = self.nil_object()
-        if expression.elem_type in self.val_types:
+        if expression.elem_type in self.var_types:
             result = self.evaluate_value(expression, scopes)
         elif expression.elem_type == self.VAR_NODE:
             result = self.evaluate_variable_node(expression, scopes)
@@ -147,25 +183,58 @@ class Interpreter(InterpreterBase):
                 ErrorType.NAME_ERROR,
                 f"Function {fcall_name} was not found",
             )
+
         new_scope = dict()
-        new_scope['ret'] = Data_Object(self.NIL_NODE, None)
-        fcall_arg_name_list = self.func_defs_to_node[fcall_dict_key].dict['args']
+        default_return = self.nil_object()
+        return_type = self.func_defs_to_node[fcall_dict_key].dict['return_type']
+        if return_type == self.INT_NODE:
+            default_return = self.int_object()
+        elif return_type == self.BOOL_NODE:
+            default_return = self.false_object()
+        elif return_type == self.STRING_NODE:
+            default_return = self.string_object()
+        elif return_type in self.struct_types:
+            default_return = self.struct_object()
+
+        new_scope['ret'] = default_return
+        fcall_arg_param_list = self.func_defs_to_node[fcall_dict_key].dict['args']
         fcall_arg_list = statement_node.dict['args']
         for i in range(len(fcall_arg_list)):
             cur_arg_node = fcall_arg_list[i]
+            cur_param_name = fcall_arg_param_list[i].dict['name']
+            cur_param_type = fcall_arg_param_list[i].dict['var_type']
             arg = None
             if cur_arg_node.elem_type == self.VAR_NODE:
                 arg = self.evaluate_variable_node(cur_arg_node, scopes)
-            elif cur_arg_node.elem_type in self.val_types:
+            elif cur_arg_node.elem_type in self.var_types:
                 arg = self.evaluate_value(cur_arg_node, scopes)
             elif cur_arg_node.elem_type == self.FCALL_NODE:
                 arg = self.do_call(cur_arg_node, scopes)
             else:
                 arg = self.evaluate_expression(cur_arg_node, scopes)
-            new_scope[fcall_arg_name_list[i].dict['name']] = arg
+
+            if cur_param_type != arg.get_type():
+                if cur_param_type == self.BOOL_NODE and arg.get_type() == self.INT_NODE:
+                    arg = arg.coerce_i_to_b()
+                else:
+                    super().error(
+                        ErrorType.TYPE_ERROR,
+                        f"Type mismatch on formal parameter {cur_param_name}"
+                    )
+            new_scope[cur_param_name] = arg
         func_context = [new_scope, dict()]
         self.run_func(self.func_defs_to_node[fcall_dict_key], func_context)
-        return func_context[0]['ret']
+
+        func_return = func_context[0]['ret']
+        if func_return.get_type() != return_type:
+            if func_return.get_type() == self.INT_NODE and return_type == self.BOOL_NODE:
+                func_return = func_return.coerce_i_to_b()
+            else:
+                super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Returned value's type {func_return.get_type()} is inconsistent with function's return type {return_type}"
+                )
+        return func_return
     
     def do_if(self, if_node, scopes):
         if self.trace_output:
@@ -210,7 +279,7 @@ class Interpreter(InterpreterBase):
         ret_eval_type = return_node.dict['expression'].elem_type
         if ret_eval_type == self.VAR_NODE:
             ret_val = self.evaluate_variable_node(return_node.dict['expression'], scopes)
-        elif ret_eval_type in self.val_types:
+        elif ret_eval_type in self.var_types:
             ret_val = self.evaluate_value(return_node.dict['expression'], scopes)
         elif ret_eval_type in self.bool_ops or ret_eval_type in self.arithmetic_ops or ret_eval_type in self.comparison_ops:
             ret_val = self.evaluate_expression(return_node.dict['expression'], scopes)
@@ -230,91 +299,86 @@ class Interpreter(InterpreterBase):
         elem_type = expression_node.elem_type
         elem_1 = expression_node.dict['op1']
         operand_1 = self.evaluate_operand(elem_1, scopes)
+        op1_type = operand_1.get_type()
 
         if elem_type == self.NEG_NODE:
-            if operand_1.get_type() != self.INT_NODE:
+            if op1_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Incompatible type for neg operation"
                 )
-            return Data_Object(self.INT_NODE, -1 * operand_1.get_value())
+            return -operand_1
         elif elem_type == self.NOT_NODE:
-            if operand_1.get_type() != self.BOOL_NODE:
+            if op1_type != self.BOOL_NODE and op1_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Incompatible type for ! operation"
                 )
-            return Data_Object(self.BOOL_NODE, not operand_1.get_value())
+            return not operand_1
         
         elem_2 = expression_node.dict['op2']
         operand_2 = self.evaluate_operand(elem_2, scopes)
 
+        op2_type = operand_2.get_type()
         if elem_type == '+':
             if self.check_addition_compatible(operand_1, operand_2):
-                result = operand_1 + operand_2
-                if type(result) is int:
-                    return Data_Object(self.INT_NODE, result)
-                return Data_Object(self.STRING_NODE, result)
+                return operand_1 + operand_2
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Cannot use operator + on non-string and non-integer operators"
             )
         elif elem_type == '-':
-            if operand_1.get_type() != self.INT_NODE or operand_2.get_type() != self.INT_NODE:
+            if op1_type != self.INT_NODE or op2_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator - on non-integer operators"
                 )
-            return Data_Object(self.INT_NODE, operand_1 - operand_2)
+            return operand_1 - operand_2
         elif elem_type == '/':
-            if operand_1.get_type() != self.INT_NODE or operand_2.get_type() != self.INT_NODE:
+            if op1_type != self.INT_NODE or op2_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Cannot use operator / on non-integer operators"
                 )
-            return Data_Object(self.INT_NODE, operand_1 // operand_2)
+            return operand_1 // operand_2
         elif elem_type == '*':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return Data_Object(self.INT_NODE, operand_1 * operand_2)
+            return operand_1 * operand_2
         elif elem_type == '==':
-            if operand_1.get_type() != operand_2.get_type():
-                return self.false_object()
-            return Data_Object(self.BOOL_NODE, operand_1 == operand_2)
+            return operand_1 == operand_2
         elif elem_type == '<':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return Data_Object(self.BOOL_NODE, operand_1 < operand_2)
+            return operand_1 < operand_2
         elif elem_type == '>':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return Data_Object(self.BOOL_NODE, operand_1 > operand_2)
+            return operand_1 > operand_2
         elif elem_type == '<=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return Data_Object(self.BOOL_NODE, operand_1 <= operand_2)
+            return self.BOOL_NODE, operand_1 <= operand_2
         elif elem_type == '>=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return Data_Object(self.BOOL_NODE, operand_1 >= operand_2)
+            return operand_1 >= operand_2
         elif elem_type == '!=':
-            if operand_1.get_type() != operand_2.get_type():
-                return self.true_object()
-            return Data_Object(self.BOOL_NODE, operand_1 != operand_2)
+            return operand_1 != operand_2
         elif elem_type == '||':
-            if operand_1.get_type() != self.BOOL_NODE or operand_2.get_type() != self.BOOL_NODE:
+            if op1_type != self.BOOL_NODE and op1_type != self.INT_NODE or op2_type != self.BOOL_NODE and op2_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
-                    f"Cannot use operator || on non-boolean operators"
+                    f"Invalid types used with operator ||"
                 )
-            return Data_Object(self.BOOL_NODE, operand_1.get_value() or operand_2.get_value())
+            return operand_1.logical_or(operand_2)
         elif elem_type == '&&':
-            if operand_1.get_type() != self.BOOL_NODE or operand_2.get_type() != self.BOOL_NODE:
+            if op1_type != self.BOOL_NODE and op1_type != self.INT_NODE or op2_type != self.BOOL_NODE and op2_type != self.INT_NODE:
                 super().error(
                     ErrorType.TYPE_ERROR,
-                    f"Cannot use operator && on non-boolean operators"
+                    f"Invalid types used with operator &&"
                 )
-            return Data_Object(self.BOOL_NODE, operand_1.get_value() and operand_2.get_value())
+            return operand_1.logical_and(operand_2)
 
     #####################################################################
     # variable node evaluation 
@@ -376,10 +440,15 @@ class Interpreter(InterpreterBase):
         condition_eval = self.nil_object()
         if condition_type == self.VAR_NODE:
             condition_eval = self.evaluate_variable_node(condition_node, scopes)
-        elif condition_type == self.BOOL_NODE:
+        elif condition_type == self.BOOL_NODE or condition_type == self.INT_NODE:
             condition_eval = self.evaluate_value(condition_node, scopes)
-        elif condition_type in self.bool_ops or condition_type in self.comparison_ops:
+        elif condition_type in self.bool_ops or condition_type in self.comparison_ops or condition_type in self.arithmetic_ops:
             condition_eval = self.evaluate_expression(condition_node, scopes)
+        elif condition_type == self.FCALL_NODE:
+            condition_eval = self.do_call(condition_node, scopes)
+       
+        if condition_eval.get_type() == self.INT_NODE:
+            condition_eval = condition_eval.coerce_i_to_b()
 
         if not self.check_boolean(condition_eval):
             super().error(
@@ -387,6 +456,11 @@ class Interpreter(InterpreterBase):
                 f"Expression does not evaluate to boolean",
             )
         return condition_eval
+    
+    def coerce_i_to_b(self, condition_object):
+        if condition_object.get_value() == 0:
+            return self.false_object()
+        return self.true_object()
 
     #####################################################################
     # custom functions (called from any scope)
@@ -495,4 +569,12 @@ class Interpreter(InterpreterBase):
     def false_object(self):
         return Data_Object(self.BOOL_NODE, False)
     
+    def int_object(self):
+        return Data_Object(self.INT_NODE, 0)
+    
+    def string_object(self):
+        return Data_Object(self.STRING_NODE, "")
+    
+    def struct_object(self):
+        return Struct_Object(self.STRUCT_NODE, None)
     
