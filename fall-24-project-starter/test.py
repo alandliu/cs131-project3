@@ -179,20 +179,19 @@ OUT */
     program_scratch = """
 struct dog {
   name : string;
-}
+  friend : dog;
+  age : int;
+  }
+  struct cat {
+    name : string;
+  }
 
-struct cat {
-  name : string;
-}
-
-func main() : void {
-  var x : dog;
-  x = t();
-}
-
-func t() : void {
-  return;
-}
+  func main() : void {
+    var fido : dog;
+    fido = new dog;
+    fido.name = "Fido";
+    fido.age = 15;
+  }
     """
 
     interpreter = Interpreter()

@@ -178,23 +178,34 @@ class Interpreter(InterpreterBase):
         else:
             result = self.evaluate_expression(expression, scopes)
             
-        # Returns will ALWAYS be Data Objects
         var_type = ref_scope[var_name].get_type()
         assign_type = result.get_type()
-        print(var_type, " ", assign_type)
-        if var_type != assign_type:
-            if var_type == self.BOOL_NODE and assign_type == self.INT_NODE:
-                result = result.coerce_i_to_b()
-            elif var_type == self.NIL_DEF and assign_type in self.struct_types and ref_scope[var_name].struct_type == assign_type:
-                result = self.nil_object(assign_type)
-            elif var_type in self.struct_types and assign_type == self.NIL_NODE:
-                ref_scope[var_name] = self.nil_object(var_type)
-            else:
-                super().error(
-                    ErrorType.TYPE_ERROR,
-                    f"Type mismatch {var_type} vs {assign_type} in assignment"
-                )
+
+        if len(var_fields) > 0:
+            res_struct, field_name = self.get_struct_member(ref_scope[var_name], var_fields, statement_node.dict['name'])
+            var_type = res_struct.get_field_type(field_name)
+            result = self.assign_helper(var_type, assign_type, res_struct, result)
+            res_struct.change_field(field_name, result)
+            return
+        elif var_type != assign_type:
+            result = self.assign_helper(var_type, assign_type, ref_scope[var_name], result)
         ref_scope[var_name] = result
+        return
+    
+    def assign_helper(self, var_type, assign_type, ref_struct, result):
+        if var_type == assign_type:
+            return result
+        elif var_type == self.BOOL_NODE and assign_type == self.INT_NODE:
+            return result.coerce_i_to_b()
+        elif var_type == self.NIL_DEF and assign_type in self.struct_types and ref_struct.struct_type == assign_type:
+            return result
+        elif var_type in self.struct_types and assign_type == self.NIL_NODE:
+            return self.nil_object(var_type)
+        else:
+            super().error(
+                ErrorType.TYPE_ERROR,
+                f"Type mismatch {var_type} vs {assign_type} in assignment"
+            )
         return
     
     def do_call(self, statement_node, scopes):
@@ -418,7 +429,7 @@ class Interpreter(InterpreterBase):
         elif elem_type == '<=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
-            return self.BOOL_NODE, operand_1 <= operand_2
+            return operand_1 <= operand_2
         elif elem_type == '>=':
             self.type_check(operand_1, operand_2, elem_type)
             self.verify_integer(operand_1, elem_type)
@@ -509,7 +520,7 @@ class Interpreter(InterpreterBase):
     
     def evaluate_conditional(self, condition_node, scopes):
         condition_type = condition_node.elem_type
-        condition_eval = self.nil_object()
+        condition_eval = self.false_object()
         if condition_type == self.VAR_NODE:
             condition_eval = self.evaluate_variable_node(condition_node, scopes)
         elif condition_type == self.BOOL_NODE or condition_type == self.INT_NODE:
@@ -539,29 +550,38 @@ class Interpreter(InterpreterBase):
             print(scopes)
         output = ""
         for arg in args:
+            res = None
             if arg.elem_type == self.VAR_NODE:
                 res = self.evaluate_variable_node(arg, scopes)
                 if res.get_type() == self.BOOL_NODE:
-                    output += self.fcall_print_bool_helper(res)
+                    res = self.fcall_print_bool_helper(res)
+                elif res.get_type() == self.NIL_NODE:
+                    res = self.NIL_DEF
                 else:
-                    output += str(res.get_value())
+                    res = str(res.get_value())
             elif arg.elem_type == self.INT_NODE or arg.elem_type == self.STRING_NODE:
-                output += str(self.evaluate_value(arg, scopes).get_value())
+                res = str(self.evaluate_value(arg, scopes).get_value())
             elif arg.elem_type in self.arithmetic_ops:
-                output += str(self.evaluate_expression(arg, scopes).get_value())
+                res = str(self.evaluate_expression(arg, scopes).get_value())
             elif arg.elem_type in self.comparison_ops or arg.elem_type in self.bool_ops:
                 res = self.evaluate_expression(arg, scopes)
-                output += self.fcall_print_bool_helper(res)
+                res = self.fcall_print_bool_helper(res)
             elif arg.elem_type == self.BOOL_NODE:
-                output += self.fcall_print_bool_helper(Data_Object(self.BOOL_NODE, arg.dict['val']))
+                res = self.fcall_print_bool_helper(Data_Object(self.BOOL_NODE, arg.dict['val']))
             elif arg.elem_type == self.FCALL_NODE:
                 res = self.do_call(arg, scopes)
                 if res.get_type() == self.BOOL_NODE:
-                    output += self.fcall_print_bool_helper(res)
+                    res = self.fcall_print_bool_helper(res)
+                elif res.get_type() == self.NIL_NODE:
+                    res = self.NIL_DEF
                 else:
-                    output += str(res.get_value())
+                    res = str(res.get_value())
             elif arg.elem_type == self.NIL_NODE:
-                output += self.NIL_DEF
+                res = self.NIL_DEF
+
+            if res == None:
+                res = self.NIL_DEF
+            output += res
         super().output(output)
         return self.void_object()
     
@@ -647,4 +667,29 @@ class Interpreter(InterpreterBase):
     
     def string_object(self):
         return Data_Object.string_object(self.STRING_NODE)
+    
+    #####################################################################
+    #  Struct Helpers
+    #####################################################################
+    
+    def get_struct_member(self, ref_struct, var_fields, full_name):
+        self.verify_dot_operation(ref_struct.get_type(), var_fields[0], full_name)
+        if len(var_fields) == 1:
+            return ref_struct, var_fields[0]
+        n_ref_struct = ref_struct.get_field(var_fields[0])
+        n_var_fields = var_fields[1:]
+        return self.get_struct_member(n_ref_struct, n_var_fields, full_name)
+    
+    def verify_dot_operation(self, var_type, var_name, full_name):
+        if var_type == self.NIL_NODE:
+            super().error(
+                ErrorType.FAULT_ERROR,
+                f"Error dereferencing nil value {var_name} in {full_name}"
+            )
+        elif var_type not in self.struct_types:
+            super().error(
+                ErrorType.TYPE_ERROR,
+                f"Dot used with non-struct {var_type} in {full_name}"
+            )
+        return
     

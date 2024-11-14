@@ -18,7 +18,7 @@ class Struct_Object(Data_Object):
                 self.fields[field_name] = self.nil_object(self.NIL_TYPE)
 
     def __str__(self):
-        print(f"Struct {self.struct_type}")
+        return f"Struct {self.struct_type}"
 
     def __repr__(self):
         res = f"({self.val_type} {self.struct_type} "
@@ -33,10 +33,14 @@ class Struct_Object(Data_Object):
     def __eq__(self, other):
         return self is other
     
+    
     def change_field(self, field_name, field_data):
-        return
+        self.fields[field_name] = field_data
     
     def get_field(self, field_name):
-        return
+        return self.fields[field_name]
+    
+    def get_field_type(self, field_name):
+        return self.get_field(field_name).get_type()
     
     
