@@ -43,6 +43,7 @@ class Interpreter(InterpreterBase):
             print(self.ast)
         self.var_name_to_val = dict()
         self.func_defs_to_node = dict()
+        self.valid_coercions = { self.INT_NODE: [self.BOOL_NODE] }
         self.global_scope = [ self.var_name_to_val ]
         self.var_types = [ self.INT_NODE, self.BOOL_NODE, self.STRING_NODE, self.NIL_NODE ]
         self.struct_types = [s.dict['name'] for s in self.ast.dict['structs']]
@@ -160,6 +161,16 @@ class Interpreter(InterpreterBase):
             result = self.evaluate_expression(expression, scopes)
             
         # Returns will ALWAYS be Data Objects
+        var_type = ref_scope[var_name].get_type()
+        assign_type = result.get_type()
+        if var_type != assign_type:
+            if var_type == self.BOOL_NODE and assign_type == self.INT_NODE:
+                result = result.coerce_i_to_b()
+            else:
+                super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Type mismatch {var_type} vs {assign_type} in assignment"
+                )
         ref_scope[var_name] = result
         return
     
@@ -185,7 +196,7 @@ class Interpreter(InterpreterBase):
             )
 
         new_scope = dict()
-        default_return = self.nil_object()
+        default_return = self.void_object()
         return_type = self.func_defs_to_node[fcall_dict_key].dict['return_type']
         if return_type == self.INT_NODE:
             default_return = self.int_object()
@@ -194,7 +205,7 @@ class Interpreter(InterpreterBase):
         elif return_type == self.STRING_NODE:
             default_return = self.string_object()
         elif return_type in self.struct_types:
-            default_return = self.struct_object()
+            default_return = self.nil_object()
 
         new_scope['ret'] = default_return
         fcall_arg_param_list = self.func_defs_to_node[fcall_dict_key].dict['args']
@@ -229,6 +240,8 @@ class Interpreter(InterpreterBase):
         if func_return.get_type() != return_type:
             if func_return.get_type() == self.INT_NODE and return_type == self.BOOL_NODE:
                 func_return = func_return.coerce_i_to_b()
+            elif func_return.get_type() == self.NIL_NODE and return_type in self.struct_types:
+                func_return = self.nil_object()
             else:
                 super().error(
                     ErrorType.TYPE_ERROR,
@@ -456,11 +469,6 @@ class Interpreter(InterpreterBase):
                 f"Expression does not evaluate to boolean",
             )
         return condition_eval
-    
-    def coerce_i_to_b(self, condition_object):
-        if condition_object.get_value() == 0:
-            return self.false_object()
-        return self.true_object()
 
     #####################################################################
     # custom functions (called from any scope)
@@ -493,8 +501,10 @@ class Interpreter(InterpreterBase):
                     output += self.fcall_print_bool_helper(res)
                 else:
                     output += str(res.get_value())
+            elif arg.elem_type == self.NIL_NODE:
+                output += self.NIL_DEF
         super().output(output)
-        return self.nil_object()
+        return self.void_object()
     
     def fcall_inputi(self, scopes, prompt = None):
         if self.trace_output:
@@ -557,11 +567,15 @@ class Interpreter(InterpreterBase):
             return False
         return True
 
+
     #####################################################################
     #  Constant Data Nodes
     #####################################################################
     def nil_object(self):
         return Data_Object(self.NIL_NODE, None)
+    
+    def void_object(self):
+        return Data_Object(self.VOID_DEF, None)
     
     def true_object(self):
         return Data_Object(self.BOOL_NODE, True)

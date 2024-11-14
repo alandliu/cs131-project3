@@ -177,16 +177,12 @@ OUT */
     """
 
     program_scratch = """
-func main() : void {
-	var a : int;
-	a = 0;
-	test(a);
-	print(a);
+func main() : int {
+  print(foo());
 }
 
-func test(x : int) : string {
-  x = x + 1;
-  return x;
+func foo() : int {
+  return 1;
 }
     """
     interpreter = Interpreter()

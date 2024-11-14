@@ -3,6 +3,7 @@ class Data_Object:
     INT_TYPE = 'int'
     STRING_TYPE = 'string'
     BOOL_TYPE = 'bool'
+    VOID_TYPE = 'void'
     COERCIBLE = [ INT_TYPE, BOOL_TYPE ]
 
     def __init__(self, val_type, value):
@@ -59,7 +60,9 @@ class Data_Object:
     def __eq__(self, other):
         if self.val_type in self.COERCIBLE and other.val_type in self.COERCIBLE:
             return Data_Object(self.BOOL_TYPE, self.coerce_i_to_b().value == other.coerce_i_to_b().value)
-        return self.false_object()
+        elif self.val_type != other.val_type:
+            return self.false_object()
+        return Data_Object(self.BOOL_TYPE, self.value == other.value)
     
     def __le__(self, other):
         return Data_Object(self.BOOL_TYPE, self.value <= other.value)
@@ -70,7 +73,9 @@ class Data_Object:
     def __ne__(self, other):
         if self.val_type in self.COERCIBLE and other.val_type in self.COERCIBLE:
             return Data_Object(self.BOOL_TYPE, self.coerce_i_to_b().value != other.coerce_i_to_b().value)
-        return self.true_object()
+        elif self.val_type != other.val_type:
+            return self.true_object()
+        return Data_Object(self.BOOL_TYPE, self.value != other.value)
     
     # OBJECT DEFAULTS
     def true_object(self):
