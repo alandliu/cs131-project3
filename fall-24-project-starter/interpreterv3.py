@@ -67,6 +67,7 @@ class Interpreter(InterpreterBase):
         main_func_node = self.get_main_func_node(self.ast)
         self.verify_all_func_types()
         self.verify_all_struct_fields()
+
         self.run_func(main_func_node, self.global_scope)
 
     #####################################################################
@@ -137,7 +138,7 @@ class Interpreter(InterpreterBase):
         elif var_type == self.BOOL_NODE:
             init_val = self.false_object()
         elif var_type in self.struct_types:
-            init_val = self.nil_object()
+            init_val = self.nil_object(var_type)
         else:
             super().error(
                 ErrorType.TYPE_ERROR,
@@ -151,7 +152,9 @@ class Interpreter(InterpreterBase):
             print("Running assignment: " + statement_node.dict['name'])
             print(scopes)
         ref_scope = None
-        var_name = statement_node.dict['name']
+        var_segments = statement_node.dict['name'].split('.')
+        var_name = var_segments[0]
+        var_fields = var_segments[1:]
         for scope in reversed(scopes):
             if var_name in scope:
                 ref_scope = scope
@@ -178,11 +181,14 @@ class Interpreter(InterpreterBase):
         # Returns will ALWAYS be Data Objects
         var_type = ref_scope[var_name].get_type()
         assign_type = result.get_type()
+        print(var_type, " ", assign_type)
         if var_type != assign_type:
             if var_type == self.BOOL_NODE and assign_type == self.INT_NODE:
                 result = result.coerce_i_to_b()
-            elif var_type == self.NIL_DEF and assign_type in self.struct_types or var_type in self.struct_types and assign_type == self.NIL_NODE:
-                ref_scope[var_name] = result
+            elif var_type == self.NIL_DEF and assign_type in self.struct_types and ref_scope[var_name].struct_type == assign_type:
+                result = self.nil_object(assign_type)
+            elif var_type in self.struct_types and assign_type == self.NIL_NODE:
+                ref_scope[var_name] = self.nil_object(var_type)
             else:
                 super().error(
                     ErrorType.TYPE_ERROR,
@@ -444,7 +450,7 @@ class Interpreter(InterpreterBase):
             return operand_1.logical_and(operand_2)
 
     def init_new_struct(self, struct_type):
-        return Struct_Object(struct_type, self.struct_types[struct_type])
+        return Struct_Object(struct_type, struct_type, self.struct_types[struct_type])
 
     #####################################################################
     # variable node evaluation 
@@ -624,8 +630,8 @@ class Interpreter(InterpreterBase):
     #####################################################################
     #  Constant Data Nodes
     #####################################################################
-    def nil_object(self):
-        return Data_Object.nil_object(self.NIL_NODE)
+    def nil_object(self, struct_type = 'nil'):
+        return Struct_Object(self.NIL_NODE, struct_type, [])
     
     def void_object(self):
         return Data_Object.void_object(self.VOID_DEF)
@@ -641,3 +647,4 @@ class Interpreter(InterpreterBase):
     
     def string_object(self):
         return Data_Object.string_object(self.STRING_NODE)
+    

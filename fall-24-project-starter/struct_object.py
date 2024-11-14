@@ -1,8 +1,9 @@
 from data_object import Data_Object
 
 class Struct_Object(Data_Object):
-    def __init__(self, struct_type, field_nodes):
-        super().__init__(struct_type, None)
+    def __init__(self, init_type, struct_type, field_nodes):
+        super().__init__(init_type, None)
+        self.struct_type = struct_type
         self.fields = dict()
         for field in field_nodes:
             field_name = field.dict['name']
@@ -17,10 +18,10 @@ class Struct_Object(Data_Object):
                 self.fields[field_name] = self.nil_object(self.NIL_TYPE)
 
     def __str__(self):
-        print(f"Struct {self.val_type}")
+        print(f"Struct {self.struct_type}")
 
     def __repr__(self):
-        res = f"({self.val_type} "
+        res = f"({self.val_type} {self.struct_type} "
         for f_name in self.fields.keys():
             res += f_name + ":"
             f_val = self.fields[f_name]
@@ -37,3 +38,5 @@ class Struct_Object(Data_Object):
     
     def get_field(self, field_name):
         return
+    
+    

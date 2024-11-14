@@ -181,12 +181,20 @@ struct dog {
   name : string;
 }
 
-func main() : void {
-  if (5 != "test") {
-    print("Hey.");
-  }
+struct cat {
+  name : string;
 }
 
+func main() : void {
+  var x : dog;
+  x = t();
+}
+
+func t() : void {
+  return;
+}
     """
+
     interpreter = Interpreter()
     interpreter.run(program_scratch)
+
