@@ -25,7 +25,7 @@ class Struct_Object(Data_Object):
         for f_name in self.fields.keys():
             res += f_name + ":"
             f_val = self.fields[f_name]
-            res += str(f_val)
+            res += repr(f_val)
             res += ", "
         res += ")"
         return res
@@ -35,6 +35,10 @@ class Struct_Object(Data_Object):
             return self.true_object(self.BOOL_TYPE)
         return Data_Object(self.BOOL_TYPE, self is other)
     
+    def __ne__(self, other):
+        if self.val_type == self.NIL_TYPE and other.val_type == self.NIL_TYPE:
+            return self.false_object(self.BOOL_TYPE)
+        return Data_Object(self.BOOL_TYPE, self is not other)
     
     def change_field(self, field_name, field_data):
         self.fields[field_name] = field_data

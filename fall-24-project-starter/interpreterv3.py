@@ -186,9 +186,8 @@ class Interpreter(InterpreterBase):
             var_type = res_struct.get_field_type(field_name)
             result = self.assign_helper(var_type, assign_type, res_struct.get_field(field_name), result)
             res_struct.change_field(field_name, result)
-            return
-        elif var_type != assign_type:
-            result = self.assign_helper(var_type, assign_type, ref_scope[var_name], result)
+            return 
+        result = self.assign_helper(var_type, assign_type, ref_scope[var_name], result)
         ref_scope[var_name] = result
         return
     
@@ -202,9 +201,6 @@ class Interpreter(InterpreterBase):
         elif var_type in self.struct_types and assign_type == self.NIL_NODE:
             return self.nil_object(var_type)
         else:
-            print(ref_struct.struct_type)
-            print(assign_type)
-            print(var_type)
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Type mismatch {var_type} vs {assign_type} in assignment"
@@ -264,6 +260,8 @@ class Interpreter(InterpreterBase):
             if cur_param_type != arg.get_type():
                 if cur_param_type == self.BOOL_NODE and arg.get_type() == self.INT_NODE:
                     arg = arg.coerce_i_to_b()
+                elif cur_param_type in self.struct_types and arg.get_type() == self.NIL_NODE and arg.struct_type == cur_param_type:
+                    arg = arg
                 else:
                     super().error(
                         ErrorType.TYPE_ERROR,
@@ -415,6 +413,8 @@ class Interpreter(InterpreterBase):
                 if (op1_type == self.INT_NODE or op1_type == self.BOOL_NODE) and (op2_type == self.INT_NODE or op2_type == self.BOOL_NODE):
                     operand_1 = operand_1.coerce_i_to_b()
                     operand_2 = operand_2.coerce_i_to_b()
+                elif op1_type in self.struct_types and op2_type == self.NIL_NODE or op1_type == self.NIL_NODE and op2_type in self.struct_types:
+                    return operand_1 == operand_2
                 else:
                     super().error(
                         ErrorType.TYPE_ERROR,
@@ -442,6 +442,8 @@ class Interpreter(InterpreterBase):
                 if (op1_type == self.INT_NODE or op1_type == self.BOOL_NODE) and (op2_type == self.INT_NODE or op2_type == self.BOOL_NODE):
                     operand_1 = operand_1.coerce_i_to_b()
                     operand_2 = operand_2.coerce_i_to_b()
+                elif op1_type in self.struct_types and op2_type == self.NIL_NODE or op1_type == self.NIL_NODE and op2_type in self.struct_types:
+                    return operand_1 != operand_2
                 else:
                     super().error(
                         ErrorType.TYPE_ERROR,

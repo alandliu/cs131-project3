@@ -177,15 +177,57 @@ OUT */
     """
 
     program_scratch = """
-struct dog {
-  name: string;
-  vaccinated: bool;  
+struct list {
+    val: int;
+    next: list;
+}
+
+func cons(val: int, l: list) : list {
+    var h: list;
+    h = new list;
+    h.val = val;
+    h.next = l;
+    return h;
+}
+
+func rev_app(l: list, a: list) : list {
+    if (l == nil) {
+        return a;
+    }
+
+    return rev_app(l.next, cons(l.val, a));
+}
+
+func reverse(l: list) : list {
+    var a: list;
+
+    return rev_app(l, a);
+}
+
+func print_list(l: list): void {
+    var x: list;
+    var n: int;
+    for (x = l; x != nil; x = x.next) {
+        print(x.val);
+        n = n + 1;
+    }
+    print("N=", n);
 }
 
 func main() : void {
-  var d: dog;    /* d is an object reference whose value is nil */
+    var n: int;
+    var i: int;
+    var l: list;
+    var r: list;
 
-  print (d);  /* prints nil, because d was initialized to nil */
+    n = inputi();
+    for (i = n; i; i = i - 1) {
+        var n: int;
+        n = inputi();
+        l = cons(n, l);
+    }
+    r = reverse(l);
+    print_list(r);
 }
     """
 
