@@ -11,7 +11,7 @@ class Interpreter(InterpreterBase):
     # Init functions
     #####################################################################
     
-    def __init__(self, console_output=True, inp=None, trace_output=True):
+    def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
 
@@ -226,7 +226,6 @@ class Interpreter(InterpreterBase):
 
         if fcall_name == 'print':
             return self.fcall_print(statement_node.dict['args'], scopes)
-
         elif fcall_name == 'inputi':
             return self.fcall_inputi(scopes, statement_node.dict['args'])
         elif fcall_name == 'inputs':
@@ -250,8 +249,8 @@ class Interpreter(InterpreterBase):
             default_return = self.string_object()
         elif return_type in self.struct_types:
             default_return = self.nil_object()
-
         new_scope['ret'] = default_return
+
         fcall_arg_param_list = self.func_defs_to_node[fcall_dict_key].dict['args']
         fcall_arg_list = statement_node.dict['args']
         for i in range(len(fcall_arg_list)):
@@ -271,7 +270,7 @@ class Interpreter(InterpreterBase):
             if cur_param_type != arg.get_type():
                 if cur_param_type == self.BOOL_NODE and arg.get_type() == self.INT_NODE:
                     arg = arg.coerce_i_to_b()
-                elif cur_param_type in self.struct_types and arg.get_type() == self.NIL_NODE and arg.struct_type == cur_param_type:
+                elif cur_param_type in self.struct_types and arg.get_type() == self.NIL_NODE and (arg.struct_type == self.NIL_NODE or arg.struct_type == cur_param_type):
                     arg = arg
                 else:
                     super().error(
@@ -286,8 +285,8 @@ class Interpreter(InterpreterBase):
         if func_return.get_type() != return_type:
             if func_return.get_type() == self.INT_NODE and return_type == self.BOOL_NODE:
                 func_return = func_return.coerce_i_to_b()
-            elif func_return.get_type() == self.NIL_NODE and return_type in self.struct_types:
-                func_return = self.nil_object()
+            elif func_return.get_type() == self.NIL_NODE and return_type in self.struct_types and (func_return.struct_type == return_type or func_return.struct_type == self.NIL_NODE):
+                func_return = self.nil_object(return_type)
             else:
                 super().error(
                     ErrorType.TYPE_ERROR,
@@ -382,7 +381,9 @@ class Interpreter(InterpreterBase):
                     ErrorType.TYPE_ERROR,
                     f"Incompatible type for ! operation"
                 )
-            return not operand_1
+            if op1_type == self.INT_NODE:
+                operand_1 = operand_1.coerce_i_to_b()
+            return operand_1.logical_not()
         
         elem_2 = expression_node.dict['op2']
         operand_2 = self.evaluate_operand(elem_2, scopes)

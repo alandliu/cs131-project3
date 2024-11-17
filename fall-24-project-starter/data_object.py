@@ -22,7 +22,7 @@ class Data_Object:
 
     # Representation and Coercion
     def __str__(self):
-        return f"{self.value}"
+        return f"do: {self.value}"
     
     def __repr__(self):
         return f"(type={self.val_type},val={self.value})"
@@ -81,6 +81,10 @@ class Data_Object:
     def logical_or(self, other):
         res = self.coerce_i_to_b().get_value() or other.coerce_i_to_b().get_value()
         return Data_Object(self.BOOL_TYPE, res)
+    
+    def logical_not(self):
+        res = self.coerce_i_to_b()
+        return Data_Object(self.BOOL_TYPE, not res.get_value())
     
     # DEFAULTS
     @staticmethod
