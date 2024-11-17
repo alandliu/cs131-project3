@@ -181,6 +181,8 @@ class Interpreter(InterpreterBase):
         var_type = ref_scope[var_name].get_type()
         assign_type = result.get_type()
 
+        self.check_struct_equivalence(ref_scope[var_name], result)
+
         if len(var_fields) > 0:
             res_struct, field_name = self.get_struct_member(ref_scope[var_name], var_fields, statement_node.dict['name'])
             var_type = res_struct.get_field_type(field_name)
@@ -191,6 +193,15 @@ class Interpreter(InterpreterBase):
         ref_scope[var_name] = result
         return
     
+    def check_struct_equivalence(self, obj_1, obj_2):
+        if obj_1.get_type() == self.NIL_NODE and obj_2.get_type() == self.NIL_NODE:
+            if obj_1.struct_type != self.NIL_NODE and obj_2.struct_type != self.NIL_NODE:
+                if obj_1.struct_type != obj_2.struct_type:
+                    super().error(
+                        ErrorType.TYPE_ERROR,
+                        f"Type mismatch {obj_1.struct_type} vs {obj_2.struct_type}"
+                    )
+
     def assign_helper(self, var_type, assign_type, ref_struct, result):
         if var_type == assign_type:
             return result
@@ -377,7 +388,9 @@ class Interpreter(InterpreterBase):
         operand_2 = self.evaluate_operand(elem_2, scopes)
         op2_type = operand_2.get_type()
 
-        if op1_type == self.VOID_DEF or op2_type ==self.VOID_DEF:
+        self.check_struct_equivalence(operand_1, operand_2)
+
+        if op1_type == self.VOID_DEF or op2_type == self.VOID_DEF:
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Can't compare void type"
@@ -584,6 +597,11 @@ class Interpreter(InterpreterBase):
                     res = self.fcall_print_bool_helper(res)
                 elif res.get_type() == self.NIL_NODE:
                     res = self.NIL_DEF
+                elif res.get_type() == self.VOID_DEF:
+                    super().error(
+                        ErrorType.TYPE_ERROR,
+                        f"Cannot print type void"
+                    )
                 else:
                     res = str(res.get_value())
             elif arg.elem_type == self.NIL_NODE:
@@ -591,6 +609,7 @@ class Interpreter(InterpreterBase):
 
             if res == None:
                 res = self.NIL_DEF
+
             output += res
         super().output(output)
         return self.void_object()

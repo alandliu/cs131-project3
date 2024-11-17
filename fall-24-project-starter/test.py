@@ -215,20 +215,34 @@ func print_list(l: list): void {
 }
 
 func main() : void {
-    var n: int;
-    var i: int;
-    var l: list;
-    var r: list;
-
-    n = inputi();
-    for (i = n; i; i = i - 1) {
-        var n: int;
-        n = inputi();
-        l = cons(n, l);
-    }
-    r = reverse(l);
-    print_list(r);
+    var l : list;
+    print(print_list(l));
 }
+
+/*
+*IN*
+8
+1
+2
+3
+4
+5
+6
+7
+8
+*IN*
+*OUT*
+1
+2
+3
+4
+5
+6
+7
+8
+N=8
+*OUT*
+*/
     """
 
     interpreter = Interpreter()
