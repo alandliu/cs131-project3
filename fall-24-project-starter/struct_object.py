@@ -46,6 +46,9 @@ class Struct_Object(Data_Object):
     def get_field(self, field_name):
         return self.fields[field_name]
     
+    def field_exists(self, field_name):
+        return field_name in self.fields
+    
     def get_field_type(self, field_name):
         return self.get_field(field_name).get_type()
     

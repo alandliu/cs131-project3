@@ -11,7 +11,7 @@ class Interpreter(InterpreterBase):
     # Init functions
     #####################################################################
     
-    def __init__(self, console_output=True, inp=None, trace_output=False):
+    def __init__(self, console_output=True, inp=None, trace_output=True):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
 
@@ -703,6 +703,11 @@ class Interpreter(InterpreterBase):
     
     def get_struct_member(self, ref_struct, var_fields, full_name):
         self.verify_dot_operation(ref_struct.get_type(), var_fields[0], full_name)
+        if not self.verify_field(ref_struct, var_fields[0]):
+            super().error(
+                ErrorType.NAME_ERROR,
+                f"No field in struct with field {var_fields[0]}"
+            )
         if len(var_fields) == 1:
             return ref_struct, var_fields[0]
         n_ref_struct = ref_struct.get_field(var_fields[0])
@@ -721,4 +726,7 @@ class Interpreter(InterpreterBase):
                 f"Dot used with non-struct {var_type} in {full_name}"
             )
         return
+    
+    def verify_field(self, struct_obj, field_name):
+        return struct_obj.field_exists(field_name)
     
